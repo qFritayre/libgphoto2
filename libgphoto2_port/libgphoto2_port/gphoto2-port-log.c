@@ -303,19 +303,44 @@ gp_logv (GPLogLevel level, const char *domain, const char *format,
 {
 	unsigned int i;
 	char *str = 0;
+	int doMalloc = 1;
+	int logit = 0;
 
 	if (!log_funcs_count || level > log_max_level)
 		return;
 
-	str = gpi_vsnprintf(format, args);
-	if (!str) {
-		GP_LOG_E ("Malloc for expanding format string '%s' failed.", format);
-		return;
-	}
-
 	for (i = 0; i < log_funcs_count; i++)
-		if (log_funcs[i].level >= level)
+	{
+		if (log_funcs[i].level < level)
+		{
+			logit = 0;
+		}
+		else if(doMalloc)
+		{
+			// Malloc for expanding format string only once
+			str = gpi_vsnprintf(format, args);
+			if (!str) 
+			{
+				GP_LOG_E ("Malloc for expanding format string '%s' failed.", format);
+				break;
+			}
+			else
+			{
+				doMalloc = 0;
+				logit = 1;
+			}
+		}
+		else
+		{
+			logit = 1;
+		}	
+
+		if(logit)
+		{
 			log_funcs[i].func (level, domain, str, log_funcs[i].data);
+			logit = 0;
+		}
+	}
 	free (str);
 }
 
